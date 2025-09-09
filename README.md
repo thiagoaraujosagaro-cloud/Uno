@@ -1,1 +1,387 @@
-jogo de uno via navegador
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>UNO — Versão móvel (toque)</title>
+<style>
+  :root{
+    --bg1:#0f1730; --bg2:#2b1a2f;
+    --card-w:84px; --card-h:140px;
+    --accent:#ffd94d;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:linear-gradient(180deg,var(--bg1),var(--bg2));color:#fff;display:flex;align-items:center;justify-content:center}
+  .app{width:98vw;max-width:1100px;padding:12px}
+  .panel{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.18));border-radius:16px;padding:12px;position:relative;overflow:hidden;box-shadow:0 14px 40px rgba(0,0,0,0.6)}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+  h1{margin:0;font-size:1.15rem;letter-spacing:1px}
+  .meta{font-size:0.85rem;opacity:.86}
+
+  .table-area{height:66vh;min-height:460px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative}
+  /* players row */
+  .players-row{position:absolute;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;gap:8px;padding:6px}
+  .player{width:130px;background:rgba(255,255,255,0.03);padding:8px;border-radius:10px;display:flex;flex-direction:column;align-items:center;gap:6px}
+  .player .name{font-weight:800;font-size:.95rem}
+  .player .cards{font-size:.9rem;background:rgba(0,0,0,0.12);padding:6px;border-radius:8px;width:100%;text-align:center}
+
+  /* center pile */
+  .pile{display:flex;align-items:center;gap:14px;z-index:10}
+  .deck{width:var(--card-w);height:var(--card-h);border-radius:24px;background:#111;display:flex;align-items:center;justify-content:center;font-weight:900;cursor:pointer;user-select:none;box-shadow:0 10px 30px rgba(0,0,0,0.6)}
+  .top{width:calc(var(--card-w)*1.25);height:calc(var(--card-h)*1.25);border-radius:24px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.05rem;user-select:none;box-shadow:0 16px 36px rgba(0,0,0,0.6)}
+  .card-oval { border-radius:20px / 30px; } /* ovaly look */
+
+  /* hand bottom */
+  .hand-bottom{position:absolute;bottom:-48px;left:50%;transform:translateX(-50%);display:flex;gap:12px;align-items:flex-end;z-index:20;padding:6px}
+  .hand-card{width:calc(var(--card-w)*1.18);height:calc(var(--card-h)*1.18);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.02rem;border-radius:20px / 28px;user-select:none;touch-action:manipulation;cursor:pointer;box-shadow:0 10px 28px rgba(0,0,0,0.6);transition:transform .12s, box-shadow .12s}
+  .hand-card:active{transform:translateY(-10px) scale(1.02)}
+  .card-red{background:linear-gradient(180deg,#ff7b7b,#8b1e1e);color:#fff}
+  .card-blue{background:linear-gradient(180deg,#7fbfff,#1e4f8b);color:#021}
+  .card-green{background:linear-gradient(180deg,#8ff2a4,#1f8b3a);color:#022}
+  .card-yellow{background:linear-gradient(180deg,#fff09a,#b8861e);color:#111}
+  .card-wild{background:linear-gradient(180deg,#222,#0a0a0a);border:3px solid var(--accent);color:#fff}
+
+  /* center controls */
+  .center-controls{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;gap:10px;flex-wrap:wrap;justify-content:center;z-index:30}
+  .btn{padding:12px 18px;border-radius:12px;border:none;font-weight:800;cursor:pointer;background:rgba(255,255,255,0.06);color:#fff;box-shadow:0 8px 28px rgba(0,0,0,0.5)}
+  .btn.play{background:#2b8cff}
+  .btn.warn{background:#d83b3b}
+  .tiny{font-size:.85rem;padding:6px 10px;border-radius:8px}
+
+  /* log and small controls */
+  .right-panel{position:absolute;top:12px;right:12px;width:220px;background:rgba(0,0,0,0.12);padding:8px;border-radius:10px;font-size:.9rem;max-height:240px;overflow:auto}
+  .bottom-ui{position:absolute;bottom:12px;left:12px;display:flex;gap:8px;align-items:center}
+
+  .badge-un o{ box-shadow:0 0 0 6px rgba(255,217,77,0.08);border-radius:10px;}
+  .uno-alert{border:2px solid var(--accent);box-shadow:0 10px 30px rgba(255,217,77,0.06)}
+
+  /* animations */
+  @keyframes dealIn { from{transform:translateY(140%) scale(.3) rotate(8deg);opacity:0} to{transform:none;opacity:1} }
+  .deal-anim{animation:dealIn .44s cubic-bezier(.2,.9,.3,1) forwards}
+  @keyframes playOut{ to{transform:translateY(-240px) scale(.7) rotate(-8deg);opacity:.02} }
+  .played{animation:playOut .46s ease forwards}
+  @keyframes glow{0%{box-shadow:0 0 0 0 rgba(255,210,60,0)}50%{box-shadow:0 0 26px 8px rgba(255,210,60,0.18)}100%{box-shadow:0 0 0 0 rgba(255,210,60,0)}}
+  .glow{animation:glow 1.1s ease}
+
+  @media(max-width:520px){:root{--card-w:68px;--card-h:116px}.players-row{display:none}.right-panel{display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="panel" id="panel">
+    <header>
+      <h1>UNO — Mobile</h1>
+      <div class="meta">Máx 6 jogadores • Toque para jogar</div>
+    </header>
+
+    <div class="table-area" id="table">
+      <div class="players-row" id="playersRow"></div>
+
+      <div class="pile" id="pile">
+        <div id="deckBtn" class="deck card-oval" title="Toque para comprar">BARALHO</div>
+        <div id="topCard" class="top card-oval card-wild">—</div>
+      </div>
+
+      <div class="center-controls" id="centerControls"></div>
+
+      <div id="handBottom" class="hand-bottom"></div>
+
+      <div class="right-panel" id="rightPanel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div><strong>Eventos</strong></div>
+          <div>
+            <button id="soundToggle" class="tiny">Som: ON</button>
+          </div>
+        </div>
+        <div id="log" style="font-size:.88rem;line-height:1.3"></div>
+      </div>
+
+      <div class="bottom-ui">
+        <div>
+          <label style="font-size:.95rem">Jogadores
+            <select id="numPlayers" class="tiny">
+              <option>2</option><option>3</option><option>4</option><option>5</option><option>6</option>
+            </select>
+          </label>
+        </div>
+        <div><button id="startBtn" class="tiny">Iniciar</button></div>
+        <div><button id="resetBtn" class="tiny">Reiniciar</button></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+/* UNO móvel — controle por toque, sons, animações. Mantém regras solicitadas. */
+
+/* --- Áudio --- */
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+let audioEnabled = true;
+function ensureAudio(){ if(!audioCtx) audioCtx = new AudioCtx(); }
+function playTone(freq, dur=0.12, type='sine', vol=0.06){
+  if(!audioEnabled) return;
+  try{
+    ensureAudio();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.value = vol;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+    setTimeout(()=>o.stop(), dur*1000 + 30);
+  }catch(e){}
+}
+function playSound(name){
+  if(!audioEnabled) return;
+  if(name==='deal'){ playTone(520,.09,'triangle',.04); setTimeout(()=>playTone(720,.06,'sine',.03),60); }
+  if(name==='play'){ playTone(660,.06,'sine',.05); playTone(880,.04,'square',.02); }
+  if(name==='draw'){ playTone(300,.12,'sine',.05); }
+  if(name==='special'){ playTone(840,.12,'sawtooth',.07); playTone(520,.08,'sine',.04); }
+  if(name==='big'){ playTone(220,.18,'sawtooth',.12); setTimeout(()=>playTone(330,.14,'sine',.07),110); }
+  if(name==='win'){ playTone(880,.1,'sine',.07); setTimeout(()=>playTone(1100,.12,'sine',.07),110); setTimeout(()=>playTone(1320,.14,'sine',.07),250); }
+}
+
+/* --- Regras / Estado --- */
+const COLORS=['red','blue','green','yellow'];
+const MAX_PLAYERS=6;
+let deck=[], discard=[], players=[], current=0, direction=1, gameActive=false, plusStack=0;
+const elTop = document.getElementById('topCard');
+const elDeck = document.getElementById('deckBtn');
+const elPlayersRow = document.getElementById('playersRow');
+const elHandBottom = document.getElementById('handBottom');
+const elCenter = document.getElementById('centerControls');
+const elLog = document.getElementById('log');
+const soundToggle = document.getElementById('soundToggle');
+
+function log(txt){
+  const d = document.createElement('div'); d.textContent = txt;
+  elLog.prepend(d);
+}
+
+/* monta deck */
+function makeDeck(){
+  const d=[];
+  for(const c of COLORS){
+    d.push({type:'NUM',color:c,val:0});
+    for(let v=1;v<=9;v++){ d.push({type:'NUM',color:c,val:v}); d.push({type:'NUM',color:c,val:v}); }
+    for(const s of ['SKIP','REVERSE','+2']){ d.push({type:'SPEC',color:c,code:s}); d.push({type:'SPEC',color:c,code:s}); }
+    d.push({type:'SPEC',color:c,code:'+10'});
+  }
+  for(let i=0;i<4;i++) d.push({type:'SPEC',color:null,code:'+4'});
+  for(let i=0;i<3;i++) d.push({type:'SPEC',color:null,code:'+99'});
+  return d;
+}
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]] } }
+function draw(){
+  if(deck.length===0){
+    const top = discard.pop();
+    deck = shuffleReturn(discard);
+    discard = [top];
+    log('Baralho reembaralhado');
+  }
+  return deck.pop();
+}
+function shuffleReturn(arr){ const a = arr.slice(); shuffle(a); return a; }
+
+/* setup inicial */
+function setup(numPlayers){
+  deck = makeDeck(); shuffle(deck);
+  players = [];
+  for(let i=0;i<numPlayers;i++) players.push({id:i,name:`Jogador ${i+1}`,hand:[],alive:true});
+  for(let r=0;r<7;r++) for(const p of players) p.hand.push(draw());
+  let top = draw();
+  while(top.type==='SPEC' && ['REVERSE','SKIP','+2','+4','+10','+99'].includes(top.code)){
+    deck.unshift(top); shuffle(deck); top = draw();
+  }
+  discard = [top];
+  current=0; direction=1; plusStack=0; gameActive=true;
+  render(); log('Jogo iniciado'); animateDeal(); playSound('deal');
+}
+
+/* render UI */
+function render(){
+  const t = discard[discard.length-1];
+  elTop.textContent = cardLabel(t);
+  elTop.className = 'top card-oval ' + cardClass(t);
+  if(t && t.type==='SPEC' && t.code==='+99'){ elTop.classList.add('glow'); playSound('special'); setTimeout(()=>elTop.classList.remove('glow'),1100); }
+
+  elPlayersRow.innerHTML = '';
+  players.forEach((p,idx)=>{
+    const div = document.createElement('div'); div.className='player';
+    const activeMark = (idx===current && gameActive) ? ' ▶' : '';
+    const uno = (p.alive && p.hand.length===1) ? ' uno' : '';
+    const nameDiv = document.createElement('div'); nameDiv.className = 'name'; nameDiv.textContent = p.name + activeMark;
+    if(p.alive && p.hand.length===1) nameDiv.classList.add('uno-alert');
+    const cardsDiv = document.createElement('div'); cardsDiv.className='cards'; cardsDiv.textContent = p.alive ? p.hand.length + ' cartas' : 'ELIMINADO';
+    div.appendChild(nameDiv); div.appendChild(cardsDiv);
+    elPlayersRow.appendChild(div);
+  });
+
+  elHandBottom.innerHTML = '';
+  const me = players[current];
+  if(me && me.alive){
+    me.hand.forEach((c,i)=>{
+      const d = document.createElement('div');
+      d.className = 'hand-card ' + cardClass(c);
+      d.textContent = cardLabel(c);
+      d.dataset.idx = i;
+      d.onclick = ()=>playCard(i);
+      // UNO highlight for last card
+      if(me.hand.length===1) d.classList.add('uno-alert');
+      elHandBottom.appendChild(d);
+    });
+  }
+
+  elCenter.innerHTML='';
+}
+
+/* helpers cards */
+function cardLabel(card){ if(!card) return '—'; return card.type==='NUM'? card.val : card.code; }
+function cardClass(card){ if(!card) return ''; if(card.type==='NUM') return 'card-' + card.color; if(card.code==='+4' || card.code==='+99') return 'card-wild'; return 'card-' + card.color; }
+
+/* validation: cor ou número ou wilds */
+function canPlayCard(card, top){
+  if(card.type==='NUM'){
+    return (top.type==='NUM' && card.val===top.val) || card.color===top.color || (top.type==='SPEC' && top.color===card.color);
+  }
+  if(card.type==='SPEC'){
+    if(card.code==='+4' || card.code==='+99') return true;
+    return card.color===top.color || (top.type==='SPEC' && top.code===card.code) || (top.type==='NUM' && card.color===top.color);
+  }
+  return false;
+}
+
+/* play / effects */
+function playCard(idx){
+  if(!gameActive) return;
+  const p = players[current];
+  const card = p.hand[idx];
+  const top = discard[discard.length-1];
+  if(!canPlayCard(card, top)){ toast('Não pode jogar essa carta agora'); return; }
+  // animate element if exists
+  const el = [...elHandBottom.children].find(x=>Number(x.dataset.idx)===idx);
+  if(el){ el.classList.add('played'); setTimeout(()=>{ try{ el.remove(); }catch(e){} },480); }
+  p.hand.splice(idx,1);
+  discard.push(card);
+  log(`${p.name} jogou ${cardLabel(card)}${card.color? ' ('+card.color+')':''}`);
+  playSound('play');
+  handleEffect(card);
+  if(p.hand.length===0){ p.alive=false; log(`${p.name} zerou! Eliminado.`); playSound('win'); }
+  const alive = players.filter(x=>x.alive).length;
+  if(alive<=1){ gameActive=false; const loser = players.find(x=>x.alive); if(loser) log('Jogo terminou. Último jogador: ' + loser.name); else log('Jogo terminou.'); render(); return; }
+  if(gameActive) nextTurnIfNeeded(card);
+  render();
+}
+
+/* handle special card logic */
+function handleEffect(card){
+  if(card.type==='NUM'){
+    if(card.val===0){ showZeroSwap(); }
+    if(card.val===9){ showNineButton(); }
+  } else if(card.type==='SPEC'){
+    if(card.code==='+2'){ plusStack += 2; log('Acumulador: +2 (agora '+plusStack+')'); }
+    if(card.code==='+10'){ plusStack += 10; log('Acumulador: +10 (agora '+plusStack+')'); }
+    if(card.code==='+4'){ plusStack += 4; log('Acumulador: +4 (agora '+plusStack+')'); }
+    if(card.code==='+99'){ plusStack += 99; log('+99 jogado — não pode ser bloqueado/invertido. Acumula +99.'); }
+    if(card.code==='SKIP'){ log('Próximo será pulado'); advance(1); }
+    if(card.code==='REVERSE'){ direction *= -1; log('Direção invertida'); }
+  }
+}
+
+/* 0 swap UI */
+function showZeroSwap(){
+  elCenter.innerHTML='';
+  const swapBtn = createButton('Trocar mão (0)', 'play');
+  swapBtn.onclick = ()=> showSwapTargets();
+  const refuseBtn = createButton('Recusar (comprar 1)', 'warn');
+  refuseBtn.onclick = ()=> { players[current].hand.push(draw()); log(players[current].name + ' recusou trocar e comprou 1'); playSound('draw'); elCenter.innerHTML=''; render(); nextTurn(); };
+  elCenter.appendChild(swapBtn); elCenter.appendChild(refuseBtn);
+}
+function showSwapTargets(){
+  elCenter.innerHTML='';
+  players.forEach((pl,idx)=>{ if(idx===current || !pl.alive) return; const b = createButton('Trocar com '+pl.name,'play'); b.onclick = ()=>{ const tmp = players[current].hand; players[current].hand = pl.hand; pl.hand = tmp; log(players[current].name + ' trocou a mão com ' + pl.name); playSound('special'); elCenter.innerHTML=''; render(); nextTurn(); }; elCenter.appendChild(b); });
+  const cancel = createButton('Cancelar (comprar 1)', 'warn'); cancel.onclick = ()=>{ players[current].hand.push(draw()); log(players[current].name + ' cancelou e comprou 1'); playSound('draw'); elCenter.innerHTML=''; render(); nextTurn(); }; elCenter.appendChild(cancel);
+}
+
+/* 9 effect UI */
+let ninePlacedOrder = [];
+function showNineButton(){
+  elCenter.innerHTML=''; ninePlacedOrder=[];
+  const b = createButton('Colocar a mão (9)', 'warn');
+  b.onclick = ()=>{ ninePlacedOrder.push(current); log(players[current].name + ' colocou a mão sobre a mesa'); playSound('special'); setTimeout(()=>{ const last = ninePlacedOrder[ninePlacedOrder.length-1]; if(last!==undefined){ players[last].hand.push(draw()); log(players[last].name + ' foi o último e comprou 1 (efeito 9)'); playSound('draw'); elCenter.innerHTML=''; render(); nextTurn(); } },1400); };
+  elCenter.appendChild(b);
+}
+
+/* stacking UI for +X */
+function nextTurnIfNeeded(card){
+  const top = discard[discard.length-1];
+  if(top && top.type==='SPEC' && ['+2','+4','+10','+99'].includes(top.code)){
+    showStackOrDraw();
+  } else nextTurn();
+}
+function showStackOrDraw(){
+  elCenter.innerHTML='';
+  const pnext = players[(current + direction + players.length) % players.length];
+  const bStack = createButton('Empilhar se tiver (+)','play');
+  bStack.onclick = ()=>{ elCenter.innerHTML=''; render(); };
+  const bDraw = createButton('Comprar ('+plusStack+')','warn');
+  bDraw.onclick = ()=>{ for(let i=0;i<plusStack;i++) players[(current + direction + players.length) % players.length].hand.push(draw()); log(pnext.name + ' comprou ' + plusStack); playSound('big'); plusStack=0; elCenter.innerHTML=''; advance(1); render(); };
+  elCenter.appendChild(bStack); elCenter.appendChild(bDraw);
+}
+
+/* advance / next */
+function advance(steps){ for(let s=0;s<steps;s++){ do{ current = (current + direction + players.length) % players.length; } while(!players[current].alive); } }
+function nextTurn(){ do{ current = (current + direction + players.length) % players.length; } while(!players[current].alive); render(); log('Vez de ' + players[current].name); }
+
+/* deck touch = draw */
+elDeck.onclick = ()=>{ if(!gameActive) return; const p = players[current]; p.hand.push(draw()); log(p.name + ' comprou 1'); playSound('draw'); render(); nextTurn(); };
+
+/* helpers */
+function createButton(text, cls){
+  const b = document.createElement('button'); b.className = 'btn ' + (cls==='warn'? 'warn' : 'play'); b.textContent = text; return b;
+}
+function toast(msg){
+  log(msg);
+}
+
+/* deal animation */
+function animateDeal(){
+  setTimeout(()=>{ const cards = elHandBottom.children; for(let i=0;i<cards.length;i++){ const c = cards[i]; c.classList.add('deal-anim'); c.style.animationDelay = (i*50)+'ms'; } },120);
+}
+
+/* start / UI wiring */
+document.getElementById('startBtn').onclick = ()=>{
+  const n = Number(document.getElementById('numPlayers').value || 2);
+  if(n < 2 || n > MAX_PLAYERS) return alert('Escolha entre 2 e 6 jogadores');
+  setup(n);
+};
+document.getElementById('resetBtn').onclick = ()=>{ location.reload(); };
+soundToggle.onclick = ()=>{
+  audioEnabled = !audioEnabled;
+  soundToggle.textContent = 'Som: ' + (audioEnabled? 'ON':'OFF');
+  if(audioEnabled) playSound('deal');
+};
+
+/* small dev helpers (não precisa usar) - ficam disponíveis no escopo global:
+   setup(n), draw(), players, discard, deck, current, nextTurn(), playCard(idx)
+*/
+window.setup = setup;
+window.draw = draw;
+window.players = players;
+window.discard = discard;
+window.deck = deck;
+window.current = current;
+window.nextTurn = nextTurn;
+window.playCard = playCard;
+
+/* inicial render */
+render();
+log('Tela pronta. Escolha número de jogadores e toque Iniciar. (Se som não tocar, toque na tela para permitir áudio no navegador).');
+
+</script>
+</body>
+</html>
+
